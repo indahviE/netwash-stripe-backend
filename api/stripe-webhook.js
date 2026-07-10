@@ -1,25 +1,45 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const admin = require('firebase-admin');
+const { initializeApp, getApps, cert } = require('firebase-admin/app');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
-if (!admin.apps.length) {
+let stripe;
+try {
+  stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+  console.log('Stripe module loaded OK');
+} catch (err) {
+  console.error('STRIPE MODULE LOAD ERROR:', err.message);
+}
+
+function initFirebase() {
+  if (getApps().length) return true;
+
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKeyRaw = process.env.FIREBASE_PRIVATE_KEY;
 
-  if (projectId && clientEmail && privateKeyRaw) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
+  console.log('Env check:', {
+    hasProjectId: !!projectId,
+    hasClientEmail: !!clientEmail,
+    hasPrivateKey: !!privateKeyRaw,
+  });
+
+  if (!projectId || !clientEmail || !privateKeyRaw) {
+    console.error('Missing Firebase env vars.');
+    return false;
+  }
+
+  try {
+    initializeApp({
+      credential: cert({
         projectId,
         clientEmail,
         privateKey: privateKeyRaw.replace(/\\n/g, '\n'),
       }),
     });
-  } else {
-    console.error('Missing Firebase env vars:', {
-      hasProjectId: !!projectId,
-      hasClientEmail: !!clientEmail,
-      hasPrivateKey: !!privateKeyRaw,
-    });
+    console.log('Firebase Admin initialized OK');
+    return true;
+  } catch (err) {
+    console.error('Firebase Admin init failed:', err.message);
+    return false;
   }
 }
 
@@ -33,47 +53,59 @@ function buffer(req) {
 }
 
 async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  if (!admin.apps.length) {
-    return res.status(500).json({ error: 'Firebase Admin not initialized (missing env vars).' });
-  }
-
-  const db = admin.firestore();
-  const sig = req.headers['stripe-signature'];
-  const rawBody = await buffer(req);
-
-  let event;
-  try {
-    event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
-  } catch (err) {
-    console.error('Webhook signature verification failed:', err.message);
-    return res.status(400).json({ error: `Webhook Error: ${err.message}` });
-  }
+  console.log('Webhook hit:', req.method);
 
   try {
+    if (!stripe) {
+      return res.status(500).json({ error: 'Stripe module not loaded.' });
+    }
+
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    const firebaseReady = initFirebase();
+    console.log('Firebase ready:', firebaseReady);
+
+    if (!firebaseReady) {
+      return res.status(500).json({ error: 'Firebase Admin not initialized.' });
+    }
+
+    const sig = req.headers['stripe-signature'];
+    const rawBody = await buffer(req);
+    console.log('Raw body length:', rawBody.length);
+
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+      console.error('Signature verification failed:', err.message);
+      return res.status(400).json({ error: `Webhook Error: ${err.message}` });
+    }
+
+    console.log('Event type:', event.type);
+
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
       const uid = session.client_reference_id;
+      console.log('uid:', uid);
 
       if (uid) {
+        const db = getFirestore();
         await db.collection('users').doc(uid).collection('subscriptions').add({
           status: 'active',
           stripeSessionId: session.id,
-          stripeSubscriptionId: session.subscription,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          stripeSubscriptionId: session.subscription || null,
+          createdAt: FieldValue.serverTimestamp(),
         });
         console.log(`Subscription activated for uid: ${uid}`);
-      } else {
-        console.error('No client_reference_id in session', session.id);
       }
     }
-    res.status(200).json({ received: true });
+
+    return res.status(200).json({ received: true });
   } catch (err) {
-    console.error('Error processing webhook:', err);
-    res.status(500).json({ error: err.message });
+    console.error('UNHANDLED ERROR:', err.message, err.stack);
+    return res.status(500).json({ error: err.message || 'Unknown error' });
   }
 }
 
