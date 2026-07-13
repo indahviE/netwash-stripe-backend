@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pembayaran Berhasil - NetWash</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Roboto, -apple-system, sans-serif;
+    background: linear-gradient(135deg, #EAF4FF 0%, #F7FAFF 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    background: #FFFFFF;
+    border-radius: 24px;
+    padding: 40px 32px;
+    max-width: 400px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(46, 134, 222, 0.12);
+  }
+  .icon-circle {
+    width: 80px;
+    height: 80px;
+    background: #E6F7EE;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+  }
+  .icon-circle svg {
+    width: 40px;
+    height: 40px;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1A1D29;
+    margin-bottom: 8px;
+  }
+  p {
+    font-size: 14px;
+    color: #6B7280;
+    line-height: 1.6;
+    margin-bottom: 28px;
+  }
+  .btn {
+    display: inline-block;
+    width: 100%;
+    background: #2E86DE;
+    color: #FFFFFF;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 14px 24px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .btn:active {
+    background: #2570BD;
+  }
+  .hint {
+    font-size: 12px;
+    color: #9CA3AF;
+    margin-top: 16px;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-circle">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#22C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <h1>Pembayaran Berhasil!</h1>
+    <p>Terima kasih, paket kamu sedang diaktifkan. Silakan kembali ke aplikasi NetWash untuk melanjutkan.</p>
+    <button class="btn" onclick="closeOrGoBack()">Kembali ke Aplikasi</button>
+    <p class="hint">Jika halaman ini tidak otomatis tertutup, silakan tutup tab ini secara manual dan buka kembali aplikasi NetWash.</p>
+  </div>
+
+  <script>
+    function closeOrGoBack() {
+      // Coba tutup tab/window (kadang berhasil kalau dibuka via script,
+      // tapi kalau dibuka manual oleh browser, ini sering diblokir).
+      window.close();
+
+      // Fallback: coba balik ke halaman sebelumnya di history.
+      setTimeout(function() {
+        if (!window.closed) {
+          window.history.back();
+        }
+      }, 300);
+    }
+  </script>
+</body>
+</html>
