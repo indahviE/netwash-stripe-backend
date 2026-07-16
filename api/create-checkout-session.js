@@ -26,7 +26,20 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { planId, successUrl, cancelUrl, uid } = req.body;
+    // FIX: tambahin companyId dari body request. Tanpa ini, webhook
+    // (checkout.session.completed) nggak punya cara tau dokumen
+    // subscription baru ini punya perusahaan yang mana, jadi field
+    // company_id di Firestore selalu kosong dan query
+    // streamActiveSubscription(companyId) di repository selalu
+    // return null walau plan-nya udah keupgrade.
+    const { planId, successUrl, cancelUrl, uid, companyId } = req.body;
+
+    if (!uid) {
+      return res.status(400).json({ error: 'uid wajib dikirim.' });
+    }
+    if (!companyId) {
+      return res.status(400).json({ error: 'companyId wajib dikirim.' });
+    }
 
     const priceId = PRICE_ID_MAP[planId];
     if (!priceId) {
@@ -38,7 +51,13 @@ module.exports = async (req, res) => {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: successUrl,
       cancel_url: cancelUrl,
-      client_reference_id: uid, // TAMBAHIN INI
+      client_reference_id: uid,
+      // FIX: companyId disimpan di metadata supaya bisa dibaca lagi
+      // di stripe-webhook.js pas event checkout.session.completed masuk.
+      metadata: {
+        uid,
+        companyId,
+      },
     });
 
     res.status(200).json({ url: session.url, sessionId: session.id });
